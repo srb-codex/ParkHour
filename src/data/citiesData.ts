@@ -1718,6 +1718,7 @@ export const CITIES_DATA: City[] = [
     generalNotes: 'En Madrid las tarifas varían según el distintivo ambiental de la DGT.',
     verified: true,
     sourceUrl: 'https://www.madrid.es',
+    hasMap: true,
     lastVerified: VERIFIED_DATE,
   },
   {
@@ -2370,6 +2371,7 @@ export const CITIES_DATA: City[] = [
     ],
     verified: true,
     sourceUrl: 'https://ola-santander.com',
+    hasMap: true,
     lastVerified: VERIFIED_DATE,
   },
   {
@@ -2851,6 +2853,7 @@ export const CITIES_DATA: City[] = [
     ],
     verified: true,
     sourceUrl: 'https://ora-valencia.es',
+    hasMap: true,
     lastVerified: VERIFIED_DATE,
   },
   {
@@ -2905,6 +2908,7 @@ export const CITIES_DATA: City[] = [
     ],
     verified: true,
     sourceUrl: 'https://valladolidora.com',
+    hasMap: true,
     lastVerified: VERIFIED_DATE,
   },
   {

@@ -50,7 +50,20 @@ export default defineConfig({
         ],
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,json,geojson,webmanifest}'],
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,json,webmanifest}'],
+        runtimeCaching: [
+          {
+            urlPattern: /\.geojson$/,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'parkhour-city-maps-v1',
+              expiration: {
+                maxEntries: 60,
+                maxAgeSeconds: 60 * 60 * 24 * 30,
+              },
+            },
+          },
+        ],
       },
     }),
   ],

@@ -175,6 +175,7 @@ function CityRow({
           </p>
           <p className="truncate text-xs text-slate-500 dark:text-slate-400">
             {city.serviceName} · {city.province}
+            {city.hasMap ? ' · Mapa disponible' : ''}
           </p>
         </div>
       </button>

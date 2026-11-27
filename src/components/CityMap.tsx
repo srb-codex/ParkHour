@@ -297,8 +297,7 @@ export function CityMap({
             <div className="space-y-1">
               <p>
                 Todavía no tenemos las zonas pintadas de{' '}
-                <strong>{city.name}</strong> en el mapa interactivo (actualmente
-                disponible en <strong>Zamora</strong>).
+                <strong>{city.name}</strong> en el mapa interactivo.
               </p>
               {city.sourceUrl && (
                 <a
@@ -384,28 +383,34 @@ export function CityMap({
             </div>
           </div>
 
-          {/* Sector quick focus chips */}
-          <div className="border-t border-slate-100 pt-2.5 dark:border-slate-800">
-            <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-              Sectores ({sectors.length}) — toca para enfocar
-            </p>
-            <div className="flex flex-wrap gap-1.5">
-              {sectors.map((item) => (
-                <button
-                  key={item.name}
-                  type="button"
-                  onClick={() => handleFocusZone(item.name)}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-700 active:scale-95 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
-                >
-                  <span
-                    className="h-2 w-2 shrink-0 rounded-full"
-                    style={{ backgroundColor: item.colorHex }}
-                  />
-                  {item.name}
-                </button>
-              ))}
+          {/* Sector quick focus chips (only when <= 20 sectors to avoid clutter) */}
+          {sectors.length <= 20 ? (
+            <div className="border-t border-slate-100 pt-2.5 dark:border-slate-800">
+              <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                Sectores ({sectors.length}) — toca para enfocar
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {sectors.map((item, idx) => (
+                  <button
+                    key={`${item.name}-${idx}`}
+                    type="button"
+                    onClick={() => handleFocusZone(item.name)}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-700 active:scale-95 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                  >
+                    <span
+                      className="h-2 w-2 shrink-0 rounded-full"
+                      style={{ backgroundColor: item.colorHex }}
+                    />
+                    {item.name}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          ) : (
+            <p className="border-t border-slate-100 pt-2.5 text-xs text-slate-500 dark:border-slate-800 dark:text-slate-400">
+              Toca cualquier zona o calle pintada en el mapa para ver su estado y horario en tiempo real.
+            </p>
+          )}
         </div>
       )}
     </div>
