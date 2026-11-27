@@ -1102,7 +1102,8 @@ export const CITIES_DATA: City[] = [
       },
     ],
     verified: true,
-    sourceUrl: 'https://www.oraguadalajara.com',
+    sourceUrl: 'https://oraguadalajara.com',
+    hasMap: true,
     lastVerified: VERIFIED_DATE,
   },
   {
