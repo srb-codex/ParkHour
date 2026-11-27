@@ -2232,6 +2232,7 @@ export const CITIES_DATA: City[] = [
     ],
     verified: true,
     sourceUrl: 'https://www.orasalamanca.es',
+    hasMap: true,
     lastVerified: VERIFIED_DATE,
   },
   {
