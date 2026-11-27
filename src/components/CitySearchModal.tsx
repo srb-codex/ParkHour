@@ -61,7 +61,7 @@ export function CitySearchModal({
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Buscar capital o provincia..."
-              className="w-full rounded-xl bg-slate-100 py-2.5 pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-800 dark:text-white"
+              className="w-full rounded-xl bg-slate-100 py-2.5 pl-9 pr-3 text-base text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-800 dark:text-white"
             />
           </div>
           <button

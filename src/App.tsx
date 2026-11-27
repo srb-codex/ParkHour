@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { CitySearchModal } from './components/CitySearchModal';
 import { InstallHint } from './components/InstallHint';
+import { UpdateBanner } from './components/UpdateBanner';
 import { ZoneCard } from './components/ZoneCard';
 import { CITIES, getCityById } from './data/cities';
 import { evaluateZoneStatus, getLocalDateParts } from './engine/scheduleEngine';
@@ -22,6 +23,7 @@ import {
 import { useGeolocation } from './hooks/useGeolocation';
 import { useNow } from './hooks/useNow';
 import { useOnlineStatus } from './hooks/useOnlineStatus';
+import { usePwaUpdate } from './hooks/usePwaUpdate';
 import type { City, LocationResolution } from './types/parking';
 
 const DEFAULT_CITY_ID = 'madrid';
@@ -42,6 +44,7 @@ export function App() {
 
   const now = useNow();
   const isOnline = useOnlineStatus();
+  const pwaUpdate = usePwaUpdate();
   const { favoriteIds, toggleFavorite, isFavorite } = useFavorites();
 
   const handleSelectCity = useCallback((selected: City, fromGps = false) => {
@@ -105,7 +108,7 @@ export function App() {
   const activeIsFavorite = isFavorite(city.id);
 
   return (
-    <div className="min-h-dvh flex flex-col bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
+    <div className="min-h-dvh w-full overflow-x-hidden flex flex-col bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
       {/* Sticky Header */}
       <header className="safe-top sticky top-0 z-30 border-b border-slate-200/80 bg-white/85 backdrop-blur-md dark:border-slate-800/80 dark:bg-slate-900/85">
         <div className="mx-auto max-w-lg px-4 pb-3">
@@ -210,6 +213,13 @@ export function App() {
 
       {/* Main Content */}
       <main className="safe-bottom mx-auto w-full max-w-lg flex-1 space-y-3.5 px-4 pt-4">
+        {/* PWA Update Banner */}
+        <UpdateBanner
+          visible={pwaUpdate.updateAvailable}
+          updating={pwaUpdate.updating}
+          onUpdate={pwaUpdate.applyUpdate}
+        />
+
         {/* Date + Offline indicator */}
         <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
           <span>{localClock.date}</span>

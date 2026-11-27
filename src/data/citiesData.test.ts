@@ -39,6 +39,8 @@ describe('Spain 52 Capitals Dataset Integrity', () => {
       }
 
       expect(city.zones.length, city.id).toBeGreaterThan(0);
+      expect(city.verified, `${city.id} verified`).toBe(true);
+      expect(city.sourceUrl, `${city.id} sourceUrl`).toMatch(/^https:\/\//);
 
       for (const zone of city.zones) {
         validateRanges(zone.schedule.weekdays, `${city.id}.${zone.id}.weekdays`);

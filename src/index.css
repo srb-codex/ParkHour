@@ -4,10 +4,14 @@
   html {
     -webkit-tap-highlight-color: transparent;
     font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    overflow-x: hidden;
+    width: 100%;
   }
 
   body {
     overscroll-behavior-y: none;
+    overflow-x: hidden;
+    width: 100%;
   }
 }
 
