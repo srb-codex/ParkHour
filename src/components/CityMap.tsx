@@ -3,7 +3,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { ExternalLink, LocateFixed, Map as MapIcon } from 'lucide-react';
 import { formatMinutesRemaining } from '../engine/scheduleEngine';
-import type { City, ParkingZone, ZoneStatus } from '../types/parking';
+import type { City, ParkingZone, ZoneColor, ZoneStatus } from '../types/parking';
 
 interface ZoneEvaluation {
   zone: ParkingZone;
@@ -20,16 +20,29 @@ interface CityMapProps {
 
 interface GeoJsonFeatureProps {
   name?: string;
-  description?: string;
+  shortLabel?: string;
+  sectorNote?: string;
   zoneId?: string;
-  stroke?: string;
-  fill?: string;
 }
 
-interface LegendItem {
+interface SectorItem {
   name: string;
-  color: string;
+  shortLabel: string;
+  colorHex: string;
 }
+
+/**
+ * Standardized tariff color palette across all cities:
+ * Map colors ALWAYS represent the parking tariff type, never arbitrary sector colors.
+ */
+const TARIFF_COLOR_HEX: Record<ZoneColor, { stroke: string; fill: string }> = {
+  blue: { stroke: '#1d4ed8', fill: '#3b82f6' },
+  green: { stroke: '#047857', fill: '#10b981' },
+  orange: { stroke: '#c2410c', fill: '#f97316' },
+  red: { stroke: '#be123c', fill: '#f43f5e' },
+  purple: { stroke: '#7e22ce', fill: '#a855f7' },
+  free_limited: { stroke: '#0369a1', fill: '#38bdf8' },
+};
 
 function escapeHtml(text: string): string {
   return text
@@ -43,15 +56,18 @@ function buildPopupHtml(
   props: GeoJsonFeatureProps,
   zoneEval: ZoneEvaluation | undefined,
 ): string {
-  const title = escapeHtml(props.name || zoneEval?.zone.name || 'Zona regulada');
+  const sectorTitle = props.name ? escapeHtml(props.name) : '';
 
   if (!zoneEval) {
     return `<div style="font-family:system-ui,sans-serif;min-width:160px">
-      <strong style="font-size:13px">${title}</strong>
+      <strong style="font-size:13px">${sectorTitle || 'Zona regulada'}</strong>
     </div>`;
   }
 
   const { zone, status } = zoneEval;
+  const heading = sectorTitle
+    ? `${escapeHtml(zone.name)} · ${sectorTitle}`
+    : escapeHtml(zone.name);
   const isPaid = status.isActive && zone.type === 'paid';
   const badgeBg = isPaid ? '#ffe4e6' : '#d1fae5';
   const badgeColor = isPaid ? '#be123c' : '#047857';
@@ -67,22 +83,27 @@ function buildPopupHtml(
   }
 
   const maxLine = zone.maxDurationMinutes
-    ? `<div style="margin-top:4px;font-size:11px;color:#64748b">
-        Máx. ${
+    ? `<div style="margin-top:4px;font-size:11px;color:#475569">
+        Tiempo máximo: <strong>${
           zone.maxDurationMinutes >= 60
             ? `${Math.floor(zone.maxDurationMinutes / 60)}h${zone.maxDurationMinutes % 60 ? ` ${zone.maxDurationMinutes % 60}m` : ''}`
             : `${zone.maxDurationMinutes} min`
-        } · ${escapeHtml(zone.name)}
+        }</strong>
       </div>`
     : '';
 
-  return `<div style="font-family:system-ui,-apple-system,sans-serif;min-width:185px;line-height:1.35">
-    <div style="font-weight:700;font-size:13px;color:#0f172a;margin-bottom:5px">${title}</div>
+  const noteLine = props.sectorNote
+    ? `<div style="margin-top:5px;font-size:11px;color:#64748b">${escapeHtml(props.sectorNote)}</div>`
+    : '';
+
+  return `<div style="font-family:system-ui,-apple-system,sans-serif;min-width:195px;line-height:1.35">
+    <div style="font-weight:700;font-size:13px;color:#0f172a;margin-bottom:5px">${heading}</div>
     <span style="display:inline-block;padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700;background:${badgeBg};color:${badgeColor}">
       ${badgeText}
     </span>
     ${nextLine}
     ${maxLine}
+    ${noteLine}
   </div>`;
 }
 
@@ -101,7 +122,7 @@ export function CityMap({
 
   const [loadingMap, setLoadingMap] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
-  const [legend, setLegend] = useState<LegendItem[]>([]);
+  const [sectors, setSectors] = useState<SectorItem[]>([]);
 
   // Initialize Leaflet map once
   useEffect(() => {
@@ -137,7 +158,7 @@ export function CityMap({
       geoLayerRef.current = null;
     }
     featureLayersRef.current.clear();
-    setLegend([]);
+    setSectors([]);
     setMapError(null);
 
     if (!city.hasMap) {
@@ -148,6 +169,9 @@ export function CityMap({
     let cancelled = false;
     setLoadingMap(true);
 
+    const resolveZoneEval = (zoneId?: string): ZoneEvaluation | undefined =>
+      zoneEvaluations.find((z) => z.zone.id === zoneId) ?? zoneEvaluations[0];
+
     const url = `${import.meta.env.BASE_URL}maps/${city.id}.geojson`;
     fetch(url)
       .then((res) => {
@@ -157,31 +181,46 @@ export function CityMap({
       .then((geojson: GeoJSON.FeatureCollection) => {
         if (cancelled || !mapRef.current) return;
 
-        const items: LegendItem[] = [];
+        const items: SectorItem[] = [];
 
         const layer = L.geoJSON(geojson, {
           style: (feature) => {
             const p = (feature?.properties ?? {}) as GeoJsonFeatureProps;
+            const zoneEval = resolveZoneEval(p.zoneId);
+            const palette =
+              TARIFF_COLOR_HEX[zoneEval?.zone.color ?? 'blue'] ??
+              TARIFF_COLOR_HEX.blue;
+
             return {
-              color: p.stroke || '#2563eb',
-              weight: 2.5,
+              color: palette.stroke,
+              weight: 2.25,
               opacity: 0.9,
-              fillColor: p.fill || '#3b82f6',
-              fillOpacity: 0.25,
+              fillColor: palette.fill,
+              fillOpacity: 0.2,
             };
           },
           onEachFeature: (feature, featureLayer) => {
             const p = (feature.properties ?? {}) as GeoJsonFeatureProps;
-            const zoneEval =
-              zoneEvaluations.find((z) => z.zone.id === p.zoneId) ??
-              zoneEvaluations[0];
+            const zoneEval = resolveZoneEval(p.zoneId);
+            const palette =
+              TARIFF_COLOR_HEX[zoneEval?.zone.color ?? 'blue'] ??
+              TARIFF_COLOR_HEX.blue;
 
             featureLayer.bindPopup(buildPopupHtml(p, zoneEval));
+
+            if (p.shortLabel) {
+              featureLayer.bindTooltip(p.shortLabel, {
+                permanent: true,
+                direction: 'center',
+                className: 'parkhour-sector-label',
+              });
+            }
 
             if (p.name) {
               items.push({
                 name: p.name,
-                color: p.fill || p.stroke || '#2563eb',
+                shortLabel: p.shortLabel || p.name,
+                colorHex: palette.fill,
               });
               featureLayersRef.current.set(p.name, featureLayer);
             }
@@ -189,7 +228,7 @@ export function CityMap({
         }).addTo(mapRef.current);
 
         geoLayerRef.current = layer;
-        setLegend(items);
+        setSectors(items);
 
         const bounds = layer.getBounds();
         if (bounds.isValid()) {
@@ -322,27 +361,58 @@ export function CityMap({
         )}
       </div>
 
-      {/* Interactive Sector Legend */}
-      {legend.length > 0 && (
-        <div className="rounded-2xl border border-slate-200/80 bg-white p-3.5 dark:border-slate-800 dark:bg-slate-900">
-          <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-            Sectores ORA ({legend.length}) — toca para enfocar
-          </p>
-          <div className="flex flex-wrap gap-1.5">
-            {legend.map((item) => (
-              <button
-                key={item.name}
-                type="button"
-                onClick={() => handleFocusZone(item.name)}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-700 active:scale-95 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
-              >
-                <span
-                  className="h-2.5 w-2.5 shrink-0 rounded-full"
-                  style={{ backgroundColor: item.color }}
-                />
-                {item.name}
-              </button>
-            ))}
+      {/* Tariff Legend + Interactive Sectors */}
+      {sectors.length > 0 && (
+        <div className="space-y-3 rounded-2xl border border-slate-200/80 bg-white p-3.5 dark:border-slate-800 dark:bg-slate-900">
+          {/* Tariff color key */}
+          <div>
+            <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+              Tipos de tarifa
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {zoneEvaluations.map(({ zone }) => {
+                const palette =
+                  TARIFF_COLOR_HEX[zone.color] ?? TARIFF_COLOR_HEX.blue;
+                return (
+                  <span
+                    key={zone.id}
+                    className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-700 dark:text-slate-200"
+                  >
+                    <span
+                      className="h-3 w-3 rounded-sm border"
+                      style={{
+                        backgroundColor: `${palette.fill}40`,
+                        borderColor: palette.stroke,
+                      }}
+                    />
+                    {zone.name}
+                  </span>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Sector quick focus chips */}
+          <div className="border-t border-slate-100 pt-2.5 dark:border-slate-800">
+            <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+              Sectores ({sectors.length}) — toca para enfocar
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {sectors.map((item) => (
+                <button
+                  key={item.name}
+                  type="button"
+                  onClick={() => handleFocusZone(item.name)}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-700 active:scale-95 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                >
+                  <span
+                    className="h-2 w-2 shrink-0 rounded-full"
+                    style={{ backgroundColor: item.colorHex }}
+                  />
+                  {item.name}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       )}
