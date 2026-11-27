@@ -22,6 +22,7 @@ interface GeoJsonFeatureProps {
   name?: string;
   shortLabel?: string;
   sectorNote?: string;
+  legendLabel?: string;
   zoneId?: string;
 }
 
@@ -29,6 +30,13 @@ interface SectorItem {
   name: string;
   shortLabel: string;
   colorHex: string;
+}
+
+interface LegendTariffItem {
+  id: string;
+  label: string;
+  stroke: string;
+  fill: string;
 }
 
 interface BoundFeature {
@@ -131,6 +139,7 @@ export function CityMap({
   const [loadingMap, setLoadingMap] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
   const [sectors, setSectors] = useState<SectorItem[]>([]);
+  const [legendTariffs, setLegendTariffs] = useState<LegendTariffItem[]>([]);
 
   // Initialize Leaflet map once
   useEffect(() => {
@@ -168,6 +177,7 @@ export function CityMap({
     featureLayersRef.current.clear();
     boundFeaturesRef.current = [];
     setSectors([]);
+    setLegendTariffs([]);
     setMapError(null);
 
     if (!city.hasMap) {
@@ -194,6 +204,7 @@ export function CityMap({
 
         const items: SectorItem[] = [];
         const boundList: BoundFeature[] = [];
+        const tariffMap = new Map<string, LegendTariffItem>();
 
         const layer = L.geoJSON(geojson, {
           style: (feature) => {
@@ -218,6 +229,16 @@ export function CityMap({
               TARIFF_COLOR_HEX[zoneEval?.zone.color ?? 'blue'] ??
               TARIFF_COLOR_HEX.blue;
 
+            const tariffKey = p.legendLabel || zoneEval?.zone.id || 'blue';
+            if (!tariffMap.has(tariffKey)) {
+              tariffMap.set(tariffKey, {
+                id: tariffKey,
+                label: p.legendLabel || zoneEval?.zone.name || 'Zona regulada',
+                stroke: palette.stroke,
+                fill: palette.fill,
+              });
+            }
+
             featureLayer.bindPopup(buildPopupHtml(p, zoneEval));
             boundList.push({ layer: featureLayer, props: p });
 
@@ -235,6 +256,7 @@ export function CityMap({
         geoLayerRef.current = layer;
         boundFeaturesRef.current = boundList;
         setSectors(items);
+        setLegendTariffs(Array.from(tariffMap.values()));
 
         const bounds = layer.getBounds();
         if (bounds.isValid()) {
@@ -385,25 +407,21 @@ export function CityMap({
               Tipos de tarifa
             </p>
             <div className="flex flex-wrap gap-2">
-              {zoneEvaluations.map(({ zone }) => {
-                const palette =
-                  TARIFF_COLOR_HEX[zone.color] ?? TARIFF_COLOR_HEX.blue;
-                return (
+              {legendTariffs.map((t) => (
+                <span
+                  key={t.id}
+                  className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-700 dark:text-slate-200"
+                >
                   <span
-                    key={zone.id}
-                    className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-700 dark:text-slate-200"
-                  >
-                    <span
-                      className="h-3 w-3 rounded-sm border"
-                      style={{
-                        backgroundColor: `${palette.fill}40`,
-                        borderColor: palette.stroke,
-                      }}
-                    />
-                    {zone.name}
-                  </span>
-                );
-              })}
+                    className="h-3 w-3 shrink-0 rounded-sm border"
+                    style={{
+                      backgroundColor: `${t.fill}40`,
+                      borderColor: t.stroke,
+                    }}
+                  />
+                  {t.label}
+                </span>
+              ))}
             </div>
           </div>
 
