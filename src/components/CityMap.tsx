@@ -208,14 +208,6 @@ export function CityMap({
 
             featureLayer.bindPopup(buildPopupHtml(p, zoneEval));
 
-            if (p.shortLabel) {
-              featureLayer.bindTooltip(p.shortLabel, {
-                permanent: true,
-                direction: 'center',
-                className: 'parkhour-sector-label',
-              });
-            }
-
             if (p.name) {
               items.push({
                 name: p.name,
