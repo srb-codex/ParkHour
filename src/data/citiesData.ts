@@ -2089,19 +2089,25 @@ export const CITIES_DATA: City[] = [
     lat: 41.5035,
     lng: -5.7468,
     radiusKm: 10,
-    serviceName: 'ORA',
-    localHolidays: [{ month: 6, day: 29, name: 'San Pedro' }],
+    serviceName: 'ORA Zamora',
+    localHolidays: [
+      { month: 6, day: 29, name: 'San Pedro' },
+    ],
     zones: [
       {
         id: 'blue',
-        name: 'Zona Azul',
+        name: 'Zona Azul (Rotación general)',
         color: 'blue',
         type: 'paid',
-        maxDurationMinutes: 120,
-        schedule: SCHED_STD_9_14_1630_2030_SAT,
+        maxDurationMinutes: 180,
+        schedule: SCHED_STD_9_14_16_20_SAT,
         holidaysFree: true,
+        notes:
+          'Máximo 3 horas (0,35 € / 30 min hasta 2,10 € / 3h). Residentes con distintivo sin límite de tiempo en su sector; servicios con distintivo hasta 9h.',
       },
     ],
+    verified: true,
+    sourceUrl: 'https://orazamora.com',
     lastVerified: VERIFIED_DATE,
   },
   {

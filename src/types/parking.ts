@@ -93,6 +93,10 @@ export interface City {
   localHolidays: LocalHoliday[];
   zones: ParkingZone[];
   lastVerified: string;
+  /** True only when schedules/zones have been checked against official municipal sources */
+  verified?: boolean;
+  /** Official municipal or operator URL for verification */
+  sourceUrl?: string;
   generalNotes?: string;
 }
 

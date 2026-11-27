@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   AlertCircle,
+  CheckCircle2,
+  ExternalLink,
   LocateFixed,
   MapPin,
   Search,
@@ -262,13 +264,37 @@ export function App() {
           </p>
         )}
 
-        {/* Footer Disclaimer */}
-        <footer className="pt-4 pb-6 text-center text-[11px] leading-relaxed text-slate-400 dark:text-slate-500">
+        {/* Verification status & Footer Disclaimer */}
+        <footer className="space-y-2 pt-4 pb-6 text-center text-[11px] leading-relaxed text-slate-400 dark:text-slate-500">
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            {city.verified ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-[11px] font-medium text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300">
+                <CheckCircle2 className="h-3 w-3" />
+                Verificado ({city.lastVerified})
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2.5 py-0.5 text-[11px] font-medium text-amber-800 dark:bg-amber-500/20 dark:text-amber-300">
+                <AlertCircle className="h-3 w-3" />
+                Datos orientativos (pendiente de revisión)
+              </span>
+            )}
+            {city.sourceUrl && (
+              <a
+                href={city.sourceUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-blue-600 underline-offset-2 hover:underline dark:text-blue-400"
+              >
+                Fuente oficial
+                <ExternalLink className="h-3 w-3" />
+              </a>
+            )}
+          </div>
           <p>
-            Información orientativa (verificada: {city.lastVerified}). Comprueba
-            siempre la señalización vertical y el parquímetro antes de estacionar.
+            Comprueba siempre la señalización vertical y el parquímetro antes de
+            estacionar.
           </p>
-          <p className="mt-1">ParkHour · 52 capitales de España · 100% offline</p>
+          <p>ParkHour · 52 capitales de España · 100% offline</p>
         </footer>
       </main>
 
