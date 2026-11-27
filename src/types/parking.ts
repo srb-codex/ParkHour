@@ -97,6 +97,8 @@ export interface City {
   verified?: boolean;
   /** Official municipal or operator URL for verification */
   sourceUrl?: string;
+  /** True when a GeoJSON zone map exists in public/maps/<id>.geojson */
+  hasMap?: boolean;
   generalNotes?: string;
 }
 

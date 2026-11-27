@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from 'react';
 import {
   AlertCircle,
   CheckCircle2,
+  Clock,
   ExternalLink,
   LocateFixed,
+  Map as MapIcon,
   MapPin,
   Search,
   Star,
@@ -13,6 +15,10 @@ import { CitySearchModal } from './components/CitySearchModal';
 import { InstallHint } from './components/InstallHint';
 import { UpdateBanner } from './components/UpdateBanner';
 import { ZoneCard } from './components/ZoneCard';
+
+const CityMap = lazy(() =>
+  import('./components/CityMap').then((m) => ({ default: m.CityMap })),
+);
 import { CITIES, getCityById } from './data/cities';
 import { evaluateZoneStatus, getLocalDateParts } from './engine/scheduleEngine';
 import {
@@ -39,6 +45,7 @@ function getInitialCity(): City {
 
 export function App() {
   const [city, setCity] = useState<City>(() => getInitialCity());
+  const [activeTab, setActiveTab] = useState<'schedule' | 'map'>('schedule');
   const [searchOpen, setSearchOpen] = useState(false);
   const [gpsMeta, setGpsMeta] = useState<LocationResolution | null>(null);
 
@@ -260,18 +267,83 @@ export function App() {
         {/* iOS Install Hint */}
         <InstallHint />
 
-        {/* Parking Zones List */}
-        <section className="space-y-3" aria-label="Zonas de aparcamiento">
-          {zoneEvaluations.map(({ zone, status }) => (
-            <ZoneCard key={`${city.id}-${zone.id}`} zone={zone} status={status} />
-          ))}
-        </section>
+        {/* View Switcher: Horarios | Mapa */}
+        <div
+          className="grid grid-cols-2 rounded-xl bg-slate-200/75 p-1 dark:bg-slate-800/80"
+          role="tablist"
+          aria-label="Modo de vista"
+        >
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'schedule'}
+            onClick={() => setActiveTab('schedule')}
+            className={`inline-flex items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs font-semibold transition-all ${
+              activeTab === 'schedule'
+                ? 'bg-white text-slate-900 shadow-xs dark:bg-slate-900 dark:text-white'
+                : 'text-slate-600 dark:text-slate-400'
+            }`}
+          >
+            <Clock className="h-3.5 w-3.5" />
+            Horarios
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'map'}
+            onClick={() => setActiveTab('map')}
+            className={`inline-flex items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs font-semibold transition-all ${
+              activeTab === 'map'
+                ? 'bg-white text-slate-900 shadow-xs dark:bg-slate-900 dark:text-white'
+                : 'text-slate-600 dark:text-slate-400'
+            }`}
+          >
+            <MapIcon className="h-3.5 w-3.5" />
+            Mapa
+            {city.hasMap && (
+              <span
+                className="h-1.5 w-1.5 rounded-full bg-emerald-500"
+                title="Zonas disponibles en mapa"
+              />
+            )}
+          </button>
+        </div>
 
-        {/* City General Notes */}
-        {city.generalNotes && (
-          <p className="rounded-2xl bg-slate-100 p-3 text-xs leading-relaxed text-slate-600 dark:bg-slate-900 dark:text-slate-400">
-            {city.generalNotes}
-          </p>
+        {/* Active View: Schedule Cards OR Interactive Map */}
+        {activeTab === 'schedule' ? (
+          <>
+            <section className="space-y-3" aria-label="Zonas de aparcamiento">
+              {zoneEvaluations.map(({ zone, status }) => (
+                <ZoneCard
+                  key={`${city.id}-${zone.id}`}
+                  zone={zone}
+                  status={status}
+                />
+              ))}
+            </section>
+
+            {city.generalNotes && (
+              <p className="rounded-2xl bg-slate-100 p-3 text-xs leading-relaxed text-slate-600 dark:bg-slate-900 dark:text-slate-400">
+                {city.generalNotes}
+              </p>
+            )}
+          </>
+        ) : (
+          <Suspense
+            fallback={
+              <div className="flex h-[58dvh] min-h-[360px] items-center justify-center rounded-2xl border border-slate-200 bg-white text-xs text-slate-500 dark:border-slate-800 dark:bg-slate-900">
+                Cargando mapa...
+              </div>
+            }
+          >
+            <CityMap
+              city={city}
+              zoneEvaluations={zoneEvaluations}
+              userCoords={geo.coords}
+              onLocate={geo.locate}
+              locating={geo.loading}
+            />
+          </Suspense>
         )}
 
         {/* Verification status & Footer Disclaimer */}

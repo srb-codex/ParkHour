@@ -6,6 +6,7 @@ import type { LocationResolution } from '../types/parking';
 export interface GeolocationState {
   loading: boolean;
   error: string | null;
+  coords: { lat: number; lng: number } | null;
   resolution: LocationResolution | null;
   locate: () => void;
   clearError: () => void;
@@ -16,6 +17,7 @@ export function useGeolocation(
 ): GeolocationState {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [resolution, setResolution] = useState<LocationResolution | null>(null);
 
   const locate = useCallback(() => {
@@ -30,6 +32,7 @@ export function useGeolocation(
     navigator.geolocation.getCurrentPosition(
       (position) => {
         const { latitude, longitude } = position.coords;
+        setCoords({ lat: latitude, lng: longitude });
         const resolved = defaultLocationResolver.resolve(
           latitude,
           longitude,
@@ -71,5 +74,5 @@ export function useGeolocation(
 
   const clearError = useCallback(() => setError(null), []);
 
-  return { loading, error, resolution, locate, clearError };
+  return { loading, error, coords, resolution, locate, clearError };
 }

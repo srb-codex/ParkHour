@@ -3006,6 +3006,7 @@ export const CITIES_DATA: City[] = [
     ],
     verified: true,
     sourceUrl: 'https://orazamora.com',
+    hasMap: true,
     lastVerified: VERIFIED_DATE,
   },
   {
