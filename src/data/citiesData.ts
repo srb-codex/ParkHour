@@ -413,6 +413,7 @@ export const CITIES_DATA: City[] = [
     generalNotes: 'En Barcelona la regulación se mantiene en agosto y las tarifas dependen de la etiqueta ambiental DGT.',
     verified: true,
     sourceUrl: 'https://www.areaverda.cat',
+    hasMap: true,
     lastVerified: VERIFIED_DATE,
   },
   {

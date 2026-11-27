@@ -191,6 +191,7 @@ export function CityMap({
       center: [city.lat, city.lng],
       zoom: 14,
       zoomControl: true,
+      preferCanvas: true,
     });
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -263,12 +264,17 @@ export function CityMap({
               TARIFF_COLOR_HEX[zoneEval?.zone.color ?? 'blue'] ??
               TARIFF_COLOR_HEX.blue;
 
+            const isLine =
+              feature?.geometry?.type === 'LineString' ||
+              feature?.geometry?.type === 'MultiLineString';
+
             return {
-              color: palette.stroke,
-              weight: 2.25,
+              color: isLine ? palette.fill : palette.stroke,
+              weight: isLine ? 4 : 2.25,
               opacity: 0.9,
               fillColor: palette.fill,
               fillOpacity: 0.18,
+              lineCap: 'round',
             };
           },
           onEachFeature: (feature, featureLayer) => {
