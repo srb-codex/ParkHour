@@ -85,6 +85,10 @@ export interface ArcGisStreetLayerConfig {
   url: string;
   /** Minimum zoom level to load street-level bands */
   minZoom: number;
+  /** Attribute name holding the paint color (default: 'Color') */
+  colorField?: string;
+  /** Comma-separated outFields to request */
+  outFields?: string;
 }
 
 export interface City {

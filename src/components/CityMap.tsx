@@ -28,8 +28,10 @@ interface GeoJsonFeatureProps {
 
 interface ArcGisBandProps {
   Color?: string;
+  color?: string;
   Bateria_Linea?: string;
   Res_NumPlazas?: number;
+  [key: string]: unknown;
 }
 
 interface SectorItem {
@@ -69,7 +71,9 @@ function mapStreetColorToZone(rawColor?: string): {
   label: string;
 } | null {
   const norm = (rawColor || '').trim().toLowerCase();
-  if (!norm || norm === 'gris') return null;
+  if (!norm || norm === 'gris' || norm === 'blanco' || norm === 'amarillo') {
+    return null;
+  }
   if (norm.includes('verde')) {
     return { zoneId: 'green', color: 'green', label: 'Zona Verde' };
   }
@@ -365,6 +369,7 @@ export function CityMap({
       // Soften barrio polygons so colored street lines stand out crisply
       geoLayerRef.current?.setStyle({ fillOpacity: 0.03, opacity: 0.35 });
 
+      const colorField = cfg.colorField || 'Color';
       const b = map.getBounds();
       const params = new URLSearchParams({
         where: '1=1',
@@ -373,7 +378,7 @@ export function CityMap({
         spatialRel: 'esriSpatialRelIntersects',
         inSR: '4326',
         outSR: '4326',
-        outFields: 'Color,Bateria_Linea,Res_NumPlazas',
+        outFields: cfg.outFields || 'Color,Bateria_Linea,Res_NumPlazas',
         resultRecordCount: '1500',
         f: 'geojson',
       });
@@ -397,14 +402,19 @@ export function CityMap({
           const streetTariffMap = new Map<string, LegendTariffItem>();
           const evals = latestEvaluationsRef.current;
 
+          const getRawColor = (p: ArcGisBandProps): string | undefined => {
+            const val = p[colorField] ?? p.Color ?? p.color;
+            return typeof val === 'string' ? val : undefined;
+          };
+
           const layer = L.geoJSON(geojson, {
             filter: (feature) => {
               const p = (feature.properties ?? {}) as ArcGisBandProps;
-              return mapStreetColorToZone(p.Color) !== null;
+              return mapStreetColorToZone(getRawColor(p)) !== null;
             },
             style: (feature) => {
               const p = (feature?.properties ?? {}) as ArcGisBandProps;
-              const mapped = mapStreetColorToZone(p.Color);
+              const mapped = mapStreetColorToZone(getRawColor(p));
               const palette =
                 TARIFF_COLOR_HEX[mapped?.color ?? 'blue'] ??
                 TARIFF_COLOR_HEX.blue;
@@ -418,7 +428,7 @@ export function CityMap({
             },
             onEachFeature: (feature, featureLayer) => {
               const p = (feature.properties ?? {}) as ArcGisBandProps;
-              const mapped = mapStreetColorToZone(p.Color);
+              const mapped = mapStreetColorToZone(getRawColor(p));
               if (!mapped) return;
 
               const zoneEval =

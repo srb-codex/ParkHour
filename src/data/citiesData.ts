@@ -2859,6 +2859,13 @@ export const CITIES_DATA: City[] = [
     verified: true,
     sourceUrl: 'https://ora-valencia.es',
     hasMap: true,
+    streetLayer: {
+      type: 'arcgis',
+      url: 'https://geoportal.valencia.es/server/rest/services/OPENDATA/Trafico/MapServer/205',
+      minZoom: 15,
+      colorField: 'color',
+      outFields: 'color',
+    },
     lastVerified: VERIFIED_DATE,
   },
   {
