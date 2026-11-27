@@ -115,9 +115,9 @@ export function App() {
   const activeIsFavorite = isFavorite(city.id);
 
   return (
-    <div className="min-h-dvh w-full overflow-x-hidden flex flex-col bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
-      {/* Sticky Header */}
-      <header className="safe-top sticky top-0 z-30 border-b border-slate-200/80 bg-white/85 backdrop-blur-md dark:border-slate-800/80 dark:bg-slate-900/85">
+    <div className="h-dvh w-full overflow-hidden flex flex-col bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
+      {/* Fixed Solid Header (never scrolls, no blur) */}
+      <header className="safe-top shrink-0 z-30 border-b border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
         <div className="mx-auto max-w-lg px-4 pb-3">
           <div className="flex items-center justify-between gap-2">
             {/* Active City Selector Button */}
@@ -218,8 +218,9 @@ export function App() {
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="safe-bottom mx-auto w-full max-w-lg flex-1 space-y-3.5 px-4 pt-4">
+      {/* Scrollable Main Content */}
+      <div className="flex-1 overflow-y-auto overflow-x-hidden overscroll-y-contain">
+        <main className="safe-bottom mx-auto w-full max-w-lg space-y-3.5 px-4 pt-4">
         {/* PWA Update Banner */}
         <UpdateBanner
           visible={pwaUpdate.updateAvailable}
@@ -378,7 +379,8 @@ export function App() {
           </p>
           <p>ParkHour · 52 capitales de España · 100% offline</p>
         </footer>
-      </main>
+        </main>
+      </div>
 
       {/* City Search Modal */}
       <CitySearchModal

@@ -31,6 +31,11 @@ interface SectorItem {
   colorHex: string;
 }
 
+interface BoundFeature {
+  layer: L.Layer;
+  props: GeoJsonFeatureProps;
+}
+
 /**
  * Standardized tariff color palette across all cities:
  * Map colors ALWAYS represent the parking tariff type, never arbitrary sector colors.
@@ -119,6 +124,9 @@ export function CityMap({
   const geoLayerRef = useRef<L.GeoJSON | null>(null);
   const userMarkerRef = useRef<L.CircleMarker | null>(null);
   const featureLayersRef = useRef<Map<string, L.Layer>>(new Map());
+  const boundFeaturesRef = useRef<BoundFeature[]>([]);
+  const latestEvaluationsRef = useRef<ZoneEvaluation[]>(zoneEvaluations);
+  latestEvaluationsRef.current = zoneEvaluations;
 
   const [loadingMap, setLoadingMap] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
@@ -148,7 +156,7 @@ export function CityMap({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Update map center & GeoJSON overlay when city or status changes
+  // Load GeoJSON overlay & fit bounds ONLY when switching city (never resets user zoom on clock ticks!)
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
@@ -158,6 +166,7 @@ export function CityMap({
       geoLayerRef.current = null;
     }
     featureLayersRef.current.clear();
+    boundFeaturesRef.current = [];
     setSectors([]);
     setMapError(null);
 
@@ -169,8 +178,10 @@ export function CityMap({
     let cancelled = false;
     setLoadingMap(true);
 
-    const resolveZoneEval = (zoneId?: string): ZoneEvaluation | undefined =>
-      zoneEvaluations.find((z) => z.zone.id === zoneId) ?? zoneEvaluations[0];
+    const resolveZoneEval = (zoneId?: string): ZoneEvaluation | undefined => {
+      const evals = latestEvaluationsRef.current;
+      return evals.find((z) => z.zone.id === zoneId) ?? evals[0];
+    };
 
     const url = `${import.meta.env.BASE_URL}maps/${city.id}.geojson`;
     fetch(url)
@@ -182,6 +193,7 @@ export function CityMap({
         if (cancelled || !mapRef.current) return;
 
         const items: SectorItem[] = [];
+        const boundList: BoundFeature[] = [];
 
         const layer = L.geoJSON(geojson, {
           style: (feature) => {
@@ -207,6 +219,7 @@ export function CityMap({
               TARIFF_COLOR_HEX.blue;
 
             featureLayer.bindPopup(buildPopupHtml(p, zoneEval));
+            boundList.push({ layer: featureLayer, props: p });
 
             if (p.name) {
               items.push({
@@ -220,6 +233,7 @@ export function CityMap({
         }).addTo(mapRef.current);
 
         geoLayerRef.current = layer;
+        boundFeaturesRef.current = boundList;
         setSectors(items);
 
         const bounds = layer.getBounds();
@@ -240,7 +254,17 @@ export function CityMap({
     return () => {
       cancelled = true;
     };
-  }, [city, zoneEvaluations]);
+  }, [city]);
+
+  // Refresh popup contents in-place when clock/status ticks (preserves zoom & pan!)
+  useEffect(() => {
+    for (const { layer, props } of boundFeaturesRef.current) {
+      const zoneEval =
+        zoneEvaluations.find((z) => z.zone.id === props.zoneId) ??
+        zoneEvaluations[0];
+      layer.setPopupContent(buildPopupHtml(props, zoneEval));
+    }
+  }, [zoneEvaluations]);
 
   // Update user GPS marker
   useEffect(() => {
