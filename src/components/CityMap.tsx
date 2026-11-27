@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { ExternalLink, LocateFixed, Map as MapIcon } from 'lucide-react';
+import { ExternalLink, LocateFixed, Map as MapIcon, ZoomIn } from 'lucide-react';
 import { formatMinutesRemaining } from '../engine/scheduleEngine';
 import type { City, ParkingZone, ZoneColor, ZoneStatus } from '../types/parking';
 
@@ -24,6 +24,12 @@ interface GeoJsonFeatureProps {
   sectorNote?: string;
   legendLabel?: string;
   zoneId?: string;
+}
+
+interface ArcGisBandProps {
+  Color?: string;
+  Bateria_Linea?: string;
+  Res_NumPlazas?: number;
 }
 
 interface SectorItem {
@@ -56,6 +62,31 @@ const TARIFF_COLOR_HEX: Record<ZoneColor, { stroke: string; fill: string }> = {
   purple: { stroke: '#7e22ce', fill: '#a855f7' },
   free_limited: { stroke: '#0369a1', fill: '#38bdf8' },
 };
+
+function mapStreetColorToZone(rawColor?: string): {
+  zoneId: string;
+  color: ZoneColor;
+  label: string;
+} | null {
+  const norm = (rawColor || '').trim().toLowerCase();
+  if (!norm || norm === 'gris') return null;
+  if (norm.includes('verde')) {
+    return { zoneId: 'green', color: 'green', label: 'Zona Verde' };
+  }
+  if (norm.includes('azul')) {
+    return { zoneId: 'blue', color: 'blue', label: 'Zona Azul' };
+  }
+  if (norm.includes('alta rot')) {
+    return { zoneId: 'red', color: 'red', label: 'Alta Rotación' };
+  }
+  if (norm.includes('naranja')) {
+    return { zoneId: 'orange', color: 'orange', label: 'Ámbito Disuasorio (Naranja)' };
+  }
+  if (norm.includes('rojo')) {
+    return { zoneId: 'red', color: 'red', label: 'Ámbito Hospitalario (Rojo)' };
+  }
+  return { zoneId: 'blue', color: 'blue', label: rawColor || 'Zona regulada' };
+}
 
 function escapeHtml(text: string): string {
   return text
@@ -130,16 +161,23 @@ export function CityMap({
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const geoLayerRef = useRef<L.GeoJSON | null>(null);
+  const streetLayerRef = useRef<L.GeoJSON | null>(null);
   const userMarkerRef = useRef<L.CircleMarker | null>(null);
   const featureLayersRef = useRef<Map<string, L.Layer>>(new Map());
   const boundFeaturesRef = useRef<BoundFeature[]>([]);
+  const boundStreetFeaturesRef = useRef<BoundFeature[]>([]);
   const latestEvaluationsRef = useRef<ZoneEvaluation[]>(zoneEvaluations);
   latestEvaluationsRef.current = zoneEvaluations;
 
   const [loadingMap, setLoadingMap] = useState(false);
+  const [loadingStreets, setLoadingStreets] = useState(false);
+  const [streetModeActive, setStreetModeActive] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
   const [sectors, setSectors] = useState<SectorItem[]>([]);
   const [legendTariffs, setLegendTariffs] = useState<LegendTariffItem[]>([]);
+  const [streetLegendTariffs, setStreetLegendTariffs] = useState<
+    LegendTariffItem[]
+  >([]);
 
   // Initialize Leaflet map once
   useEffect(() => {
@@ -174,10 +212,17 @@ export function CityMap({
       geoLayerRef.current.remove();
       geoLayerRef.current = null;
     }
+    if (streetLayerRef.current) {
+      streetLayerRef.current.remove();
+      streetLayerRef.current = null;
+    }
     featureLayersRef.current.clear();
     boundFeaturesRef.current = [];
+    boundStreetFeaturesRef.current = [];
     setSectors([]);
     setLegendTariffs([]);
+    setStreetLegendTariffs([]);
+    setStreetModeActive(false);
     setMapError(null);
 
     if (!city.hasMap) {
@@ -219,7 +264,7 @@ export function CityMap({
               weight: 2.25,
               opacity: 0.9,
               fillColor: palette.fill,
-              fillOpacity: 0.2,
+              fillOpacity: 0.18,
             };
           },
           onEachFeature: (feature, featureLayer) => {
@@ -278,9 +323,173 @@ export function CityMap({
     };
   }, [city]);
 
+  // Live street-level colored bands when zoomed in (e.g., Madrid SER Bandas de Aparcamiento)
+  useEffect(() => {
+    const map = mapRef.current;
+    const cfg = city.streetLayer;
+    if (!map || !cfg) return;
+
+    let debounceTimer: number | undefined;
+    let controller: AbortController | null = null;
+
+    const clearStreetLayer = () => {
+      if (streetLayerRef.current) {
+        streetLayerRef.current.remove();
+        streetLayerRef.current = null;
+      }
+      boundStreetFeaturesRef.current = [];
+      setStreetLegendTariffs([]);
+      setStreetModeActive(false);
+      setLoadingStreets(false);
+      // Restore barrio polygon fill visibility when zoomed out
+      geoLayerRef.current?.setStyle({ fillOpacity: 0.18, opacity: 0.9 });
+    };
+
+    const loadVisibleStreets = () => {
+      const zoom = map.getZoom();
+      if (zoom < cfg.minZoom) {
+        controller?.abort();
+        clearStreetLayer();
+        return;
+      }
+
+      if (!navigator.onLine) {
+        return;
+      }
+
+      controller?.abort();
+      controller = new AbortController();
+      setLoadingStreets(true);
+      setStreetModeActive(true);
+
+      // Soften barrio polygons so colored street lines stand out crisply
+      geoLayerRef.current?.setStyle({ fillOpacity: 0.03, opacity: 0.35 });
+
+      const b = map.getBounds();
+      const params = new URLSearchParams({
+        where: '1=1',
+        geometry: `${b.getWest()},${b.getSouth()},${b.getEast()},${b.getNorth()}`,
+        geometryType: 'esriGeometryEnvelope',
+        spatialRel: 'esriSpatialRelIntersects',
+        inSR: '4326',
+        outSR: '4326',
+        outFields: 'Color,Bateria_Linea,Res_NumPlazas',
+        resultRecordCount: '1500',
+        f: 'geojson',
+      });
+
+      fetch(`${cfg.url}/query?${params.toString()}`, {
+        signal: controller.signal,
+      })
+        .then((res) => {
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          return res.json();
+        })
+        .then((geojson: GeoJSON.FeatureCollection) => {
+          if (!mapRef.current) return;
+
+          if (streetLayerRef.current) {
+            streetLayerRef.current.remove();
+            streetLayerRef.current = null;
+          }
+
+          const boundStreets: BoundFeature[] = [];
+          const streetTariffMap = new Map<string, LegendTariffItem>();
+          const evals = latestEvaluationsRef.current;
+
+          const layer = L.geoJSON(geojson, {
+            filter: (feature) => {
+              const p = (feature.properties ?? {}) as ArcGisBandProps;
+              return mapStreetColorToZone(p.Color) !== null;
+            },
+            style: (feature) => {
+              const p = (feature?.properties ?? {}) as ArcGisBandProps;
+              const mapped = mapStreetColorToZone(p.Color);
+              const palette =
+                TARIFF_COLOR_HEX[mapped?.color ?? 'blue'] ??
+                TARIFF_COLOR_HEX.blue;
+
+              return {
+                color: palette.fill,
+                weight: zoom >= 17 ? 6 : 4.5,
+                opacity: 0.92,
+                lineCap: 'round',
+              };
+            },
+            onEachFeature: (feature, featureLayer) => {
+              const p = (feature.properties ?? {}) as ArcGisBandProps;
+              const mapped = mapStreetColorToZone(p.Color);
+              if (!mapped) return;
+
+              const zoneEval =
+                evals.find((z) => z.zone.id === mapped.zoneId) ?? evals[0];
+              const palette = TARIFF_COLOR_HEX[mapped.color];
+
+              if (!streetTariffMap.has(mapped.label)) {
+                streetTariffMap.set(mapped.label, {
+                  id: mapped.label,
+                  label: mapped.label,
+                  stroke: palette.stroke,
+                  fill: palette.fill,
+                });
+              }
+
+              const detailParts: string[] = [];
+              if (p.Res_NumPlazas) {
+                detailParts.push(
+                  `${p.Res_NumPlazas} ${p.Res_NumPlazas === 1 ? 'plaza' : 'plazas'}`,
+                );
+              }
+              if (p.Bateria_Linea) {
+                detailParts.push(`en ${p.Bateria_Linea.toLowerCase()}`);
+              }
+
+              const popupProps: GeoJsonFeatureProps = {
+                name: detailParts.length > 0 ? detailParts.join(' ') : mapped.label,
+                zoneId: mapped.zoneId,
+              };
+
+              featureLayer.bindPopup(buildPopupHtml(popupProps, zoneEval));
+              boundStreets.push({ layer: featureLayer, props: popupProps });
+            },
+          }).addTo(mapRef.current);
+
+          streetLayerRef.current = layer;
+          boundStreetFeaturesRef.current = boundStreets;
+          setStreetLegendTariffs(Array.from(streetTariffMap.values()));
+          setLoadingStreets(false);
+        })
+        .catch((err) => {
+          if (err?.name === 'AbortError') return;
+          setLoadingStreets(false);
+        });
+    };
+
+    const scheduleLoad = () => {
+      window.clearTimeout(debounceTimer);
+      debounceTimer = window.setTimeout(loadVisibleStreets, 300);
+    };
+
+    map.on('moveend', scheduleLoad);
+    map.on('zoomend', scheduleLoad);
+
+    return () => {
+      window.clearTimeout(debounceTimer);
+      controller?.abort();
+      map.off('moveend', scheduleLoad);
+      map.off('zoomend', scheduleLoad);
+    };
+  }, [city]);
+
   // Refresh popup contents in-place when clock/status ticks (preserves zoom & pan!)
   useEffect(() => {
     for (const { layer, props } of boundFeaturesRef.current) {
+      const zoneEval =
+        zoneEvaluations.find((z) => z.zone.id === props.zoneId) ??
+        zoneEvaluations[0];
+      layer.setPopupContent(buildPopupHtml(props, zoneEval));
+    }
+    for (const { layer, props } of boundStreetFeaturesRef.current) {
       const zoneEval =
         zoneEvaluations.find((z) => z.zone.id === props.zoneId) ??
         zoneEvaluations[0];
@@ -333,6 +542,11 @@ export function CityMap({
     }
   };
 
+  const activeLegend =
+    streetModeActive && streetLegendTariffs.length > 0
+      ? streetLegendTariffs
+      : legendTariffs;
+
   return (
     <div className="space-y-3">
       {/* Info notice if city has no GeoJSON layer yet */}
@@ -375,6 +589,20 @@ export function CityMap({
           aria-label={`Mapa de zonas de aparcamiento en ${city.name}`}
         />
 
+        {/* Zoom-in hint pill for cities with street-level band layers */}
+        {city.streetLayer && !streetModeActive && !loadingMap && (
+          <div className="pointer-events-none absolute top-3 right-3 z-[400] inline-flex items-center gap-1.5 rounded-full bg-slate-900/85 px-3 py-1.5 text-[11px] font-medium text-white shadow-md">
+            <ZoomIn className="h-3.5 w-3.5 text-sky-400" />
+            Acerca el zoom para ver calles por color
+          </div>
+        )}
+
+        {loadingStreets && (
+          <div className="pointer-events-none absolute top-3 right-3 z-[400] rounded-full bg-blue-600/95 px-3 py-1.5 text-[11px] font-medium text-white shadow-md">
+            Cargando calles...
+          </div>
+        )}
+
         {/* Floating GPS button */}
         <button
           type="button"
@@ -399,34 +627,40 @@ export function CityMap({
       </div>
 
       {/* Tariff Legend + Interactive Sectors */}
-      {sectors.length > 0 && (
+      {(activeLegend.length > 0 || sectors.length > 0) && (
         <div className="space-y-3 rounded-2xl border border-slate-200/80 bg-white p-3.5 dark:border-slate-800 dark:bg-slate-900">
           {/* Tariff color key */}
-          <div>
-            <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-              Tipos de tarifa
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {legendTariffs.map((t) => (
-                <span
-                  key={t.id}
-                  className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-700 dark:text-slate-200"
-                >
+          {activeLegend.length > 0 && (
+            <div>
+              <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                {streetModeActive
+                  ? 'Calles visibles por color'
+                  : 'Tipos de tarifa'}
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {activeLegend.map((t) => (
                   <span
-                    className="h-3 w-3 shrink-0 rounded-sm border"
-                    style={{
-                      backgroundColor: `${t.fill}40`,
-                      borderColor: t.stroke,
-                    }}
-                  />
-                  {t.label}
-                </span>
-              ))}
+                    key={t.id}
+                    className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-700 dark:text-slate-200"
+                  >
+                    <span
+                      className="h-3 w-3 shrink-0 rounded-sm border"
+                      style={{
+                        backgroundColor: streetModeActive
+                          ? t.fill
+                          : `${t.fill}40`,
+                        borderColor: t.stroke,
+                      }}
+                    />
+                    {t.label}
+                  </span>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Sector quick focus chips (only when <= 20 sectors to avoid clutter) */}
-          {sectors.length <= 20 ? (
+          {sectors.length > 0 && sectors.length <= 20 ? (
             <div className="border-t border-slate-100 pt-2.5 dark:border-slate-800">
               <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
                 Sectores ({sectors.length}) — toca para enfocar
@@ -450,7 +684,9 @@ export function CityMap({
             </div>
           ) : (
             <p className="border-t border-slate-100 pt-2.5 text-xs text-slate-500 dark:border-slate-800 dark:text-slate-400">
-              Toca cualquier zona o calle pintada en el mapa para ver su estado y horario en tiempo real.
+              {streetModeActive
+                ? 'Toca cualquier calle pintada para ver plazas, estado y horario en tiempo real.'
+                : 'Toca cualquier zona del mapa para ver su estado y horario en tiempo real.'}
             </p>
           )}
         </div>

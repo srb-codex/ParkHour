@@ -79,6 +79,14 @@ export interface LocalHoliday {
   year?: number;
 }
 
+export interface ArcGisStreetLayerConfig {
+  type: 'arcgis';
+  /** ArcGIS MapServer/FeatureServer layer URL (without /query) */
+  url: string;
+  /** Minimum zoom level to load street-level bands */
+  minZoom: number;
+}
+
 export interface City {
   id: string;
   name: string;
@@ -99,6 +107,8 @@ export interface City {
   sourceUrl?: string;
   /** True when a GeoJSON zone map exists in public/maps/<id>.geojson */
   hasMap?: boolean;
+  /** Optional live street-level layer loaded on demand when zoomed in */
+  streetLayer?: ArcGisStreetLayerConfig;
   generalNotes?: string;
 }
 

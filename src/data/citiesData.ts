@@ -1719,6 +1719,11 @@ export const CITIES_DATA: City[] = [
     verified: true,
     sourceUrl: 'https://www.madrid.es',
     hasMap: true,
+    streetLayer: {
+      type: 'arcgis',
+      url: 'https://sigma.madrid.es/hosted/rest/services/GEOPORTAL/SERVICIO_DE_ESTACIONAMIENTO_REGULADO/MapServer/4',
+      minZoom: 15,
+    },
     lastVerified: VERIFIED_DATE,
   },
   {
